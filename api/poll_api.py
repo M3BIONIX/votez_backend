@@ -71,9 +71,9 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
             
             updated_options_map = {}
             if poll.options is not None:
-                # Create a mapping from UUID to option ID for lookup
                 uuid_to_id_map = {opt.uuid: opt.id for opt in existing_poll.poll_options}
                 existing_option_uuids = set(uuid_to_id_map.keys())
+                id_to_title_map = {}
                 
                 for opt in poll.options:
                     if opt.uuid not in existing_option_uuids:
@@ -84,10 +84,18 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                     
                     # Get the ID from the mapping
                     option_id = uuid_to_id_map[opt.uuid]
-                    option_data = {"option_name": opt.option_text}
-                    updated_opt = await PollOptionCrud.update_option_by_id(session, option_id, option_data)
-                    updated_options_map[updated_opt.id] = updated_opt
-            
+                    id_to_title_map[option_id] = opt.option_text
+                
+                # Bulk update all options in a single query
+                updated_options = await PollOptionCrud.update_option_by_id(
+                    session, 
+                    list(id_to_title_map.keys()), 
+                    id_to_title_map
+                )
+                
+                # Map updated options by their ID for easy lookup
+                updated_options_map = {opt.id: opt for opt in updated_options}
+
             if poll.title is not None:
                 update_data = {"title": poll.title}
                 updated_poll = await PollCrud.update_poll(session, existing_poll.id, update_data)
@@ -140,11 +148,9 @@ async def get_all_polls(session: AsyncDBSession):
             
             response_list = []
             for poll in polls:
-                active_options = [opt for opt in poll.poll_options if opt.is_active]
-                
                 options_list = [
                     PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                    for opt in active_options
+                    for opt in poll.poll_options
                 ]
                 
                 poll_data = {

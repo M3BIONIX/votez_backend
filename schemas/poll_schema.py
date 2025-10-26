@@ -28,13 +28,6 @@ class UpdatePollRequestSchema(BaseModel):
     title: Optional[str] = Field(None, min_length=3, max_length=300)
     options: Optional[List[UpdatePollOptionSchema]] = Field(None, min_length=1, max_length=10)
 
-class Poll(CreatePollRequestSchema):
-    id: int
-    uuid: UUID
-    version_id: int
-    created_at: datetime
-    likes: int = Field(...)
-
 class PollResponseSchema(BaseModel):
     uuid: UUID
     title: str
