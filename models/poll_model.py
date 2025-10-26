@@ -2,9 +2,7 @@ from datetime import datetime
 from typing import List
 from sqlalchemy import String, Integer, DateTime, func, event
 from sqlalchemy.orm import Mapped, relationship, mapped_column
-
 from core.base import VersionedMixin, Base, update_version_id_on_change
-from models.poll_options_model import PollOptions
 
 
 class Poll(VersionedMixin, Base):

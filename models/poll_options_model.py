@@ -10,7 +10,7 @@ class PollOptions(VersionedMixin, Base):
 
     poll_id: Mapped[int] = mapped_column(Integer, ForeignKey("poll.id"), nullable=False)
     option_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    votes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    votes: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     poll: Mapped["Poll"] = relationship(back_populates="poll_options")
 
