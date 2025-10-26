@@ -9,6 +9,7 @@ class PollOptionSchema(BaseModel):
     votes: int
     poll_id: int
     uuid: UUID
+    version_id: int
     created_at: datetime
     
     model_config = {"from_attributes": True}
@@ -27,6 +28,7 @@ class CreatePollRequestSchema(BaseModel):
 
 class UpdatePollRequestSchema(BaseModel):
     title: Optional[str] = Field(None, min_length=3, max_length=300)
+    version_id: int
     options: Optional[List[UpdatePollOptionSchema]] = Field(None, min_length=1, max_length=10)
 
 class PollResponseSchema(BaseModel):
@@ -37,3 +39,6 @@ class PollResponseSchema(BaseModel):
     options: List[PollOptionSchema]
 
     model_config = {"from_attributes": True}
+
+class PollResponseWithVersionId(PollResponseSchema):
+    version_id: int

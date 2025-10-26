@@ -9,7 +9,7 @@ from schemas.poll_schema import (
     CreatePollRequestSchema,
     PollOptionSchema,
     PollResponseSchema,
-    UpdatePollRequestSchema
+    UpdatePollRequestSchema, PollResponseWithVersionId
 )
 from crud.poll_crud import poll_crud as PollCrud
 from crud.poll_option_crud import poll_option_crud as PollOptionCrud
@@ -61,7 +61,7 @@ async def create_poll(session: AsyncDBSession, poll: CreatePollRequestSchema):
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create poll: {str(e)}")
 
-@router.put("/{poll_uuid}", response_model=PollResponseSchema)
+@router.put("/{poll_uuid}", response_model=PollResponseWithVersionId)
 async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRequestSchema):
     try:
         async with session.begin():
@@ -71,7 +71,7 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
 
             if existing_poll.version_id != poll.version_id:
                 raise HTTPException(status_code=409, detail="Poll version conflict")
-            
+
             updated_options_map = {}
             if poll.options is not None:
                 uuid_to_id_map = {opt.uuid: opt.id for opt in existing_poll.poll_options}
@@ -104,13 +104,8 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                 updated_poll = await PollCrud.update_poll(session, existing_poll.id, update_data)
             else:
                 updated_poll = existing_poll
-            
-            final_options = []
-            for existing_opt in existing_poll.poll_options:
-                if existing_opt.id in updated_options_map:
-                    final_options.append(updated_options_map[existing_opt.id])
-                else:
-                    final_options.append(existing_opt)
+
+            final_options = [updated_options_map.get(opt.id, opt) for opt in existing_poll.poll_options]
             
             options_list = [
                 PollOptionSchema.model_validate(opt).model_dump(mode="json")
@@ -122,10 +117,11 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                 "title": updated_poll.title,
                 "likes": updated_poll.likes,
                 "created_at": updated_poll.created_at,
+                "version_id": updated_poll.version_id,
                 "options": options_list
             }
             
-        validated_response = PollResponseSchema.model_validate(response_data)
+        validated_response = PollResponseWithVersionId.model_validate(response_data)
         
         await manager.broadcast({
             "type": "poll_updated",
@@ -140,7 +136,7 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update poll: {str(e)}")
 
-@router.get("/", response_model=List[PollResponseSchema])
+@router.get("/", response_model=List[PollResponseWithVersionId])
 async def get_all_polls(session: AsyncDBSession):
     """
     Get all active polls with their active options.
@@ -161,14 +157,14 @@ async def get_all_polls(session: AsyncDBSession):
                     "title": poll.title,
                     "likes": poll.likes,
                     "created_at": poll.created_at,
+                    "version_id": poll.version_id,
                     "options": options_list
                 }
-                response_list.append(PollResponseSchema.model_validate(poll_data))
+                response_list.append(PollResponseWithVersionId.model_validate(poll_data))
             
             return response_list
         
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to fetch polls: {str(e)}")
 
 @router.delete("/{poll_uuid}")
