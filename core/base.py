@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Sequence, text
+from sqlalchemy import Integer, Sequence, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr, object_session
 
@@ -18,8 +18,7 @@ class Base(DeclarativeBase):
     def __tablename__(self) -> str:
         return self.__name__.lower()
 
-def update_version_id_on_change(target):
+def update_version_id_on_change(target, value, initiator):
     if object_session(target) is not None:
         target.version_id += 1
         object_session(target).add(target)
-
