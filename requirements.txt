@@ -1,3 +1,4 @@
+uliweb-alembic
 fastapi-pagination
 sqlalchemy
 pydantic-settings
