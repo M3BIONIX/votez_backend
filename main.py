@@ -3,12 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_pagination import add_pagination
 import uvicorn
 from core.settings import settings
+from api.api import api_router
 
 app = FastAPI(title="Votez API", version="1.0.0")
 
-add_pagination(app)
-
-
+# Add CORS middleware BEFORE including routes (important for WebSocket)
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -19,6 +18,10 @@ if settings.BACKEND_CORS_ORIGINS:
         max_age=32400,
         expose_headers=["Content-Disposition"],
     )
+
+add_pagination(app)
+
+app.include_router(api_router)
 @app.get("/")
 async def root():
     return {"message": "Votez API", "version": "1.0.0"}
