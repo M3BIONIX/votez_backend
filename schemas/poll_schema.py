@@ -27,9 +27,9 @@ class CreatePollRequestSchema(BaseModel):
     options: List[CreatePollOptionSchema] = Field(..., min_length=2, max_length=10)
 
 class UpdatePollRequestSchema(BaseModel):
-    title: Optional[str] = Field(None, min_length=3, max_length=300)
+    title: Optional[str] = Field(None, max_length=300)
     version_id: int
-    options: Optional[List[UpdatePollOptionSchema]] = Field(None, min_length=1, max_length=10)
+    options: Optional[List[UpdatePollOptionSchema]] = None
 
 class PollResponseSchema(BaseModel):
     uuid: UUID

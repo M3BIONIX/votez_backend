@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, Sequence, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr, object_session
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr
 
 
 class VersionedMixin:

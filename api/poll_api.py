@@ -105,26 +105,21 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                     list(id_to_title_map.keys()),
                     id_to_title_map
                 )
-
-                # Map updated options by their ID for easy lookup
+                existing_poll.version_id +=1
+                await session.flush()
                 updated_options_map = {opt.id: opt for opt in updated_options}
 
             if poll.title is not None:
-                # Update title using ORM (triggers events)
-                title_update_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
-                title_update_poll.title = poll.title
-                # Increment version for title change
-                title_update_poll.version_id += 1
+                existing_poll.title = poll.title
+                existing_poll.version_id += 1
                 await session.flush()
 
-            # Re-fetch the poll to get the updated version_id (from events)
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
 
-            final_options = [updated_options_map.get(opt.id, opt) for opt in updated_poll.poll_options if opt.id in updated_options_map]
 
             options_list = [
                 PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                for opt in final_options
+                for opt in updated_poll.poll_options
             ]
             
             response_data = {
