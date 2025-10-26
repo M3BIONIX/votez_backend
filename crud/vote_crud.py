@@ -56,6 +56,25 @@ class VoteCrud:
         
         result = await session.execute(stmt)
         return {row.option_id: row.count for row in result}
+    
+    async def get_votes_by_user(self, session: AsyncSession, user_id: int):
+        """Get votes with poll and option UUIDs for a user."""
+        from models import Poll, PollOptions
+        
+        # Join Vote with Poll and PollOptions to get UUIDs
+        stmt = (
+            select(
+                Poll.uuid.label("poll_uuid"),
+                PollOptions.uuid.label("option_uuid")
+            )
+            .select_from(Vote)
+            .join(Poll, Vote.poll_id == Poll.id)
+            .join(PollOptions, Vote.option_id == PollOptions.id)
+            .where(Vote.user_id == user_id)
+        )
+        
+        result = await session.execute(stmt)
+        return result.fetchall()
 
 
 vote_crud = VoteCrud()

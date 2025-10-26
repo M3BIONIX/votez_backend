@@ -36,6 +36,7 @@ class PollResponseSchema(BaseModel):
     title: str
     likes: int
     created_at: datetime
+    created_by_uuid: UUID
     options: List[PollOptionSchema]
 
     model_config = {"from_attributes": True}
@@ -48,8 +49,16 @@ class VoteRequestSchema(BaseModel):
     option_uuid: UUID = Field(..., description="UUID of the option to vote for")
 
 
+class AddPollOptionsRequestSchema(BaseModel):
+    options: List[CreatePollOptionSchema] = Field(..., min_length=1, max_length=10)
+
+
+class DeletePollOptionsRequestSchema(BaseModel):
+    option_uuids: List[UUID] = Field(..., min_length=1)
+
+
 class PollSummaryResponse(BaseModel):
-    """Response schema for poll vote summary."""
+    """Deprecated: Use PollSummaryData instead. Response schema for poll vote summary."""
     poll_uuid: UUID
     total_votes: int
     option_summary: Dict[str, float]  # option_uuid -> percentage
@@ -62,8 +71,15 @@ class LikeResponseSchema(BaseModel):
     is_liked: bool
 
 
+class PollSummaryData(BaseModel):
+    """Summary data for poll vote statistics."""
+    total_votes: int
+    option_percentages: Dict[str, float]  # option_uuid -> percentage
+
+
 class VoteResponseSchema(BaseModel):
-    """Response schema for vote operations."""
+    """Response schema for vote operations with summary."""
+    message: str
     poll_uuid: UUID
-    user_id: int
     option_uuid: UUID
+    summary: PollSummaryData

@@ -13,7 +13,11 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        try:
+            if websocket in self.active_connections:
+                self.active_connections.remove(websocket)
+        except ValueError:
+            logging.warning(f"WebSocket not in active connections")
 
     async def broadcast(self, message: dict):
         disconnected = []

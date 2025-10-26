@@ -36,6 +36,9 @@ async def get_current_user(
     try:
         # Extract token from Bearer credentials
         token = credentials.credentials
+        if not token or token.strip() == "":
+            raise credentials_exception
+        
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         user_uuid: str = payload.get("sub")
         if user_uuid is None:

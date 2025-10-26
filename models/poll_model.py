@@ -12,5 +12,5 @@ class Poll(VersionedMixin, Base):
     poll_options: Mapped[List["PollOptions"]] = relationship(back_populates="poll", cascade="all, delete-orphan")
     likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now() ,nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 

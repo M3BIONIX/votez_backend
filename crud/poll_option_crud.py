@@ -41,6 +41,36 @@ class PollOptionCrud:
         """Soft delete all options for a specific poll by setting is_active to False"""
         stmt = update(PollOptions).where(PollOptions.poll_id == poll_id).values(is_active=False)
         await session.execute(stmt)
+    
+    async def add_options_to_poll(self, session: AsyncSession, poll_id: int, options: List[dict]) -> Sequence[PollOptions]:
+        """Add new options to an existing poll."""
+        # Add poll_id to each option
+        options_data = [{**opt, "poll_id": poll_id} for opt in options]
+        return await self.create_options(session, options_data)
+    
+    async def soft_delete_options_by_uuids(self, session: AsyncSession, option_uuids: List[str]) -> int:
+        """Soft delete specific options by their UUIDs by setting is_active to False."""
+        from uuid import UUID
+        
+        # Convert UUID strings to UUID objects
+        uuid_objects = [UUID(uuid_str) for uuid_str in option_uuids]
+        
+        stmt = (
+            update(PollOptions)
+            .where(PollOptions.uuid.in_(uuid_objects))
+            .values(is_active=False)
+        )
+        result = await session.execute(stmt)
+        return result.rowcount
+    
+    async def get_option_by_uuid(self, session: AsyncSession, option_uuid: str) -> PollOptions:
+        """Get an option by its UUID."""
+        from uuid import UUID
+        
+        uuid_obj = UUID(option_uuid)
+        stmt = select(PollOptions).where(PollOptions.uuid == uuid_obj)
+        result = await session.execute(stmt)
+        return result.scalars().first()
 
 
 poll_option_crud = PollOptionCrud()

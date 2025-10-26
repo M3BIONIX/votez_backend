@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
@@ -45,4 +45,25 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
+
+
+class VotedPollInfo(BaseModel):
+    """Schema for user's voted poll information."""
+    poll_uuid: UUID
+    option_uuid: UUID
+    total_votes: int
+    summary: Dict[str, float] = Field(default_factory=dict)  # option_uuid -> percentage
+
+
+class UserMeResponse(BaseModel):
+    """Response schema for /auth/me endpoint with extended user data."""
+    id: int
+    name: str
+    email: str
+    uuid: UUID
+    created_at: datetime
+    liked_poll_uuids: List[UUID] = Field(default_factory=list)
+    voted_polls: List[VotedPollInfo] = Field(default_factory=list)
+    
+    model_config = {"from_attributes": True}
 
