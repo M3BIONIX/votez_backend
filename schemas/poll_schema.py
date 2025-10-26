@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -42,3 +42,28 @@ class PollResponseSchema(BaseModel):
 
 class PollResponseWithVersionId(PollResponseSchema):
     version_id: int
+
+
+class VoteRequestSchema(BaseModel):
+    option_uuid: UUID = Field(..., description="UUID of the option to vote for")
+
+
+class PollSummaryResponse(BaseModel):
+    """Response schema for poll vote summary."""
+    poll_uuid: UUID
+    total_votes: int
+    option_summary: Dict[str, float]  # option_uuid -> percentage
+
+
+class LikeResponseSchema(BaseModel):
+    """Response schema for like/unlike operations."""
+    poll_uuid: UUID
+    user_id: int
+    is_liked: bool
+
+
+class VoteResponseSchema(BaseModel):
+    """Response schema for vote operations."""
+    poll_uuid: UUID
+    user_id: int
+    option_uuid: UUID
