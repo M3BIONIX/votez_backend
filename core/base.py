@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, Sequence, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr, object_session
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr
 
 
 class VersionedMixin:
@@ -17,8 +17,3 @@ class Base(DeclarativeBase):
     @declared_attr
     def __tablename__(self) -> str:
         return self.__name__.lower()
-
-def update_version_id_on_change(target, value, initiator):
-    if object_session(target) is not None:
-        target.version_id += 1
-        object_session(target).add(target)
