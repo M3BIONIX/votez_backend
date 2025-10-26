@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Union, Coroutine, Sequence
+from typing import List, Sequence
 
 from sqlalchemy import insert, Row, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession

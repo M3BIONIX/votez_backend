@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from starlette.websockets import WebSocket
@@ -20,7 +21,7 @@ class ConnectionManager:
             try:
                 await connection.send_json(message)
             except Exception as e:
-                print(f"Failed to send to connection: {e}")
+                logging.warning(f"Failed to send to connection: {e}")
                 disconnected.append(connection)
 
         for conn in disconnected:

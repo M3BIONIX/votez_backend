@@ -1,6 +1,3 @@
-from operator import truediv
-from typing import Optional
-
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import Poll
@@ -16,8 +13,3 @@ class PollCrud:
 
 
 poll_crud = PollCrud()
-
-
-
-
-        

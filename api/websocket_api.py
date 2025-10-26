@@ -1,4 +1,3 @@
-import json
 from fastapi import APIRouter
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -10,8 +9,13 @@ router = APIRouter()
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
-        while True:
+        while True:   
             data = await websocket.receive_text()
-            await websocket.send_text(json.dumps({"type": "pong", "data": "Connected"}))
+            await websocket.send_json({"type": "pong", "data": "Connected"})
+            
     except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
         manager.disconnect(websocket)
