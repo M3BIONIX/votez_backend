@@ -68,6 +68,9 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
             existing_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             if not existing_poll:
                 raise HTTPException(status_code=404, detail="Poll not found")
+
+            if existing_poll.version_id != poll.version_id:
+                raise HTTPException(status_code=409, detail="Poll version conflict")
             
             updated_options_map = {}
             if poll.options is not None:

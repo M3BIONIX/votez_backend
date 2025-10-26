@@ -18,6 +18,7 @@ class CreatePollOptionSchema(BaseModel):
 
 class UpdatePollOptionSchema(BaseModel):
     uuid: UUID
+    version_id: int
     option_text: str = Field(..., min_length=1, max_length=200)
 
 class CreatePollRequestSchema(BaseModel):
