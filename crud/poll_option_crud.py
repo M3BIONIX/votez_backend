@@ -28,7 +28,8 @@ class PollOptionCrud:
         stmt = (
             update(PollOptions)
             .where(PollOptions.id.in_(option_ids))
-            .values(option_name=case_stmt)
+            .values(option_name=case_stmt,
+                    version_id = PollOptions.version_id+1)
             .returning(PollOptions)
         )
         

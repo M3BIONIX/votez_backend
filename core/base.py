@@ -17,8 +17,3 @@ class Base(DeclarativeBase):
     @declared_attr
     def __tablename__(self) -> str:
         return self.__name__.lower()
-
-def update_version_id_on_change(target, value, initiator):
-    if object_session(target) is not None:
-        target.version_id += 1
-        object_session(target).add(target)

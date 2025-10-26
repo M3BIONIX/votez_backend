@@ -19,7 +19,7 @@ router = APIRouter(
     prefix="/poll",
 )
 
-@router.post("/", response_model=PollResponseSchema)
+@router.post("/", response_model=PollResponseWithVersionId)
 async def create_poll(session: AsyncDBSession, poll: CreatePollRequestSchema):
     try:
         async with session.begin():
@@ -47,9 +47,10 @@ async def create_poll(session: AsyncDBSession, poll: CreatePollRequestSchema):
                 "title": created_poll.title,
                 "likes": created_poll.likes,
                 "created_at": created_poll.created_at,
+                "version_id": created_poll.version_id,
                 "options": options_list
             }
-        validated_response = PollResponseSchema.model_validate(response_data)
+        validated_response = PollResponseWithVersionId.model_validate(response_data)
         await manager.broadcast({
             "type": "poll_created",
             "data": validated_response.model_dump(mode="json")
@@ -72,41 +73,55 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
             if existing_poll.version_id != poll.version_id:
                 raise HTTPException(status_code=409, detail="Poll version conflict")
 
+
             updated_options_map = {}
             if poll.options is not None:
                 uuid_to_id_map = {opt.uuid: opt.id for opt in existing_poll.poll_options}
+
+                uuid_to_version_id_map = {opt.uuid: opt.version_id for opt in existing_poll.poll_options}
+
                 existing_option_uuids = set(uuid_to_id_map.keys())
                 id_to_title_map = {}
-                
+
                 for opt in poll.options:
                     if opt.uuid not in existing_option_uuids:
                         raise HTTPException(
-                            status_code=400, 
+                            status_code=400,
                             detail=f"Option with UUID {opt.uuid} does not belong to this poll"
                         )
-                    
-                    # Get the ID from the mapping
+
+                    if opt.version_id != uuid_to_version_id_map[opt.uuid]:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"Option with UUID {opt.uuid} has version conflict"
+                        )
+
                     option_id = uuid_to_id_map[opt.uuid]
                     id_to_title_map[option_id] = opt.option_text
-                
-                # Bulk update all options in a single query
+
+                # Update options using ORM (triggers events)
                 updated_options = await PollOptionCrud.update_option_by_id(
-                    session, 
-                    list(id_to_title_map.keys()), 
+                    session,
+                    list(id_to_title_map.keys()),
                     id_to_title_map
                 )
-                
+
                 # Map updated options by their ID for easy lookup
                 updated_options_map = {opt.id: opt for opt in updated_options}
 
             if poll.title is not None:
-                update_data = {"title": poll.title}
-                updated_poll = await PollCrud.update_poll(session, existing_poll.id, update_data)
-            else:
-                updated_poll = existing_poll
+                # Update title using ORM (triggers events)
+                title_update_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
+                title_update_poll.title = poll.title
+                # Increment version for title change
+                title_update_poll.version_id += 1
+                await session.flush()
 
-            final_options = [updated_options_map.get(opt.id, opt) for opt in existing_poll.poll_options]
-            
+            # Re-fetch the poll to get the updated version_id (from events)
+            updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
+
+            final_options = [updated_options_map.get(opt.id, opt) for opt in updated_poll.poll_options if opt.id in updated_options_map]
+
             options_list = [
                 PollOptionSchema.model_validate(opt).model_dump(mode="json")
                 for opt in final_options
