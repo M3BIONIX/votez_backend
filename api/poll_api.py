@@ -29,7 +29,7 @@ async def create_poll(session: AsyncDBSession, poll: CreatePollRequestSchema):
             options_data = [
                 {
                     "poll_id": created_poll.id,
-                    "option_name": opt.option_text,
+                    "option_name": opt.option_name,
                     "votes": 0,
                     "is_active": True
                 }
@@ -74,32 +74,43 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                 raise HTTPException(status_code=409, detail="Poll version conflict")
 
 
-            updated_options_map = {}
             if poll.options is not None:
-                uuid_to_id_map = {opt.uuid: opt.id for opt in existing_poll.poll_options}
+                option_map = {opt.uuid: {
+                    "id": opt.id,
+                    "version_id": opt.version_id,
+                    "option_name": opt.option_name
+                }
+                    for opt in existing_poll.poll_options}
 
-                uuid_to_version_id_map = {opt.uuid: opt.version_id for opt in existing_poll.poll_options}
-
-                existing_option_uuids = set(uuid_to_id_map.keys())
                 id_to_title_map = {}
 
                 for opt in poll.options:
-                    if opt.uuid not in existing_option_uuids:
+                    if opt.uuid not in option_map:
                         raise HTTPException(
                             status_code=400,
                             detail=f"Option with UUID {opt.uuid} does not belong to this poll"
                         )
 
-                    if opt.version_id != uuid_to_version_id_map[opt.uuid]:
+                    if opt.version_id != option_map[opt.uuid].get("version_id"):
                         raise HTTPException(
                             status_code=409,
                             detail=f"Option with UUID {opt.uuid} has version conflict"
                         )
 
-                    option_id = uuid_to_id_map[opt.uuid]
-                    id_to_title_map[option_id] = opt.option_text
+                    if opt.option_name == option_map[opt.uuid]["option_name"]:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"No update for option with UUID {opt.uuid} found"
+                        )
 
-                # Update options using ORM (triggers events)
+                    option_id = option_map[opt.uuid].get("id")
+                    if option_id is None:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to get option with UUID {opt.uuid}"
+                        )
+                    id_to_title_map[option_id] = opt.option_name
+
                 updated_options = await PollOptionCrud.update_option_by_id(
                     session,
                     list(id_to_title_map.keys()),
@@ -107,9 +118,8 @@ async def edit_poll(session: AsyncDBSession, poll_uuid: UUID, poll: UpdatePollRe
                 )
                 existing_poll.version_id +=1
                 await session.flush()
-                updated_options_map = {opt.id: opt for opt in updated_options}
 
-            if poll.title is not None:
+            if poll.title is not None and poll.title != updated_options.title:
                 existing_poll.title = poll.title
                 existing_poll.version_id += 1
                 await session.flush()
