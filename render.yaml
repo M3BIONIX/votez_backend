@@ -2,23 +2,54 @@ services:
   - type: web
     name: votez-backend
     env: python
-    plan: free
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && alembic upgrade head
+    repo: https://github.com/M3BIONIX/votez_backend
+    branch: main
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      alembic upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    pythonVersion: 3.11
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.8
+        value: "3.11"
       - key: ENVIRONMENT
         value: production
+      - key: SECRET_KEY
+        sync: false
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 11520
+        value: "11520"
+      - key: SERVER_ADDRESS
+        value: "0.0.0.0"
       - key: WATCH_FILES
         value: "false"
+      - key: POSTGRES_POOL_SIZE
+        value: "50"
+      - key: POSTGRES_MAX_OVERFLOW
+        value: "0"
+      - key: LOG_LEVEL
+        value: info
       - key: BACKEND_CORS_ORIGINS
-        value: https://your-frontend-domain.com
+        value: '["https://YOUR_FRONTEND_URL.com"]'
       - key: FRONTEND_URL
-        value: https://your-frontend-domain.com
+        value: "https://YOUR_FRONTEND_URL.com"
+      - fromDatabase:
+          name: votez-db
+          property: host
+          envVarKey: POSTGRES_SERVER
+      - fromDatabase:
+          name: votez-db
+          property: user
+          envVarKey: POSTGRES_USER
+      - fromDatabase:
+          name: votez-db
+          property: password
+          envVarKey: POSTGRES_PASSWORD
+      - fromDatabase:
+          name: votez-db
+          property: database
+          envVarKey: POSTGRES_DB
 
 databases:
-  - name: votez
+  - name: votez-db
     plan: free
