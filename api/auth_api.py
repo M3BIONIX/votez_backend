@@ -35,7 +35,6 @@ async def register(
         await session.commit()
         
         return AuthUser(
-            id=user.id,
             name=user.name,
             email=user.email,
             uuid=user.uuid,
@@ -104,7 +103,6 @@ async def get_current_user_info(
             voted_polls = await VoteCrud.get_voted_polls_info(session, current_user.id)
         
         return UserMeResponse(
-            id=current_user.id,
             name=current_user.name,
             email=current_user.email,
             uuid=current_user.uuid,

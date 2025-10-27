@@ -1,6 +1,6 @@
 from sqlalchemy import select, delete, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Sequence
+from typing import Sequence, List
 from models import Vote
 from models import Poll, PollOptions
 from sqlalchemy.orm import selectinload
@@ -28,6 +28,24 @@ class VoteCrud:
         )
         result = await session.execute(stmt)
         return result.rowcount > 0
+    
+    async def delete_all_votes_for_poll(self, session: AsyncSession, poll_id: int) -> int:
+        """Delete all votes for a specific poll. Returns number of votes deleted."""
+        stmt = delete(Vote).where(Vote.poll_id == poll_id)
+        result = await session.execute(stmt)
+        return result.rowcount
+    
+    async def has_votes_for_options(self, session: AsyncSession, poll_id: int, option_ids: List[int]) -> bool:
+        """Check if any of the given options have votes."""
+        if not option_ids:
+            return False
+        stmt = select(func.count(Vote.option_id)).where(
+            Vote.poll_id == poll_id,
+            Vote.option_id.in_(option_ids)
+        )
+        result = await session.execute(stmt)
+        count = result.scalar()
+        return count > 0
     
     async def get_vote(self, session: AsyncSession, user_id: int, poll_id: int):
         stmt = select(Vote).where(
@@ -94,29 +112,18 @@ class VoteCrud:
                 vote_counts = await self.get_vote_counts_by_poll(session, poll.id)
                 total_votes = sum(vote_counts.values())
                 
-                options_result = await session.execute(
-                    select(PollOptions)
-                    .where(PollOptions.poll_id == poll.id)
-                    .where(PollOptions.is_active == True)
-                )
-                poll_options = options_result.scalars().all()
-                
-                option_percentages = {}
+                # Calculate percentage for the voted option only
+                voted_option_votes = vote_counts.get(voted_option.id, 0)
+                percentage = 0.0
                 if total_votes > 0:
-                    for opt in poll_options:
-                        option_vote_count = vote_counts.get(opt.id, 0)
-                        percentage = (option_vote_count / total_votes) * 100
-                        option_percentages[str(opt.uuid)] = round(percentage, 2)
-                else:
-                    for opt in poll_options:
-                        option_percentages[str(opt.uuid)] = 0.0
+                    percentage = round((voted_option_votes / total_votes) * 100, 2)
                 
                 voted_polls.append(
                     VotedPollInfo(
                         poll_uuid=vote_row.poll_uuid,
                         option_uuid=vote_row.option_uuid,
                         total_votes=total_votes,
-                        summary=option_percentages
+                        percentage=percentage
                     )
                 )
         
