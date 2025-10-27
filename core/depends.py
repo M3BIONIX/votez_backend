@@ -29,12 +29,10 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Check if credentials were provided
     if credentials is None:
         raise credentials_exception
 
     try:
-        # Extract token from Bearer credentials
         token = credentials.credentials
         if not token or token.strip() == "":
             raise credentials_exception
@@ -47,7 +45,6 @@ async def get_current_user(
         raise credentials_exception
 
     async with AsyncSessionLocal() as session:
-        # Look up user by UUID instead of ID for better security
         stmt = select(UserModel).where(UserModel.uuid == user_uuid)
         result = await session.execute(stmt)
         user = result.scalars().first()

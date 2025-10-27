@@ -144,7 +144,7 @@ async def edit_poll(
 
                 # Only update options if there are actual changes
                 if id_to_title_map:
-                    updated_options = await PollOptionCrud.update_option_by_id(
+                    await PollOptionCrud.update_option_by_id(
                         session,
                         list(id_to_title_map.keys()),
                         id_to_title_map
@@ -158,29 +158,7 @@ async def edit_poll(
                 await session.flush()
 
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
-            
-            # Get creator UUID
-            from models import UserModel
-            from sqlalchemy import select
-            creator_result = await session.execute(
-                select(UserModel).where(UserModel.id == updated_poll.created_by)
-            )
-            creator = creator_result.scalars().first()
-
-            options_list = [
-                PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                for opt in updated_poll.poll_options
-            ]
-            
-            response_data = {
-                "uuid": updated_poll.uuid,
-                "title": updated_poll.title,
-                "likes": updated_poll.likes,
-                "created_at": updated_poll.created_at,
-                "version_id": updated_poll.version_id,
-                "created_by_uuid": creator.uuid if creator else None,
-                "options": options_list
-            }
+            response_data = await PollCrud.build_poll_response_data(session, updated_poll)
             
         validated_response = PollResponseWithVersionId.model_validate(response_data)
         
@@ -218,7 +196,6 @@ async def add_options_to_poll(
                     detail="You don't have permission to add options to this poll"
                 )
             
-            # Prepare options data
             new_options = [
                 {
                     "option_name": opt.option_name,
@@ -228,59 +205,18 @@ async def add_options_to_poll(
                 for opt in options_data.options
             ]
             
-            # Add options to poll
-            created_options = await PollOptionCrud.add_options_to_poll(session, existing_poll.id, new_options)
-            
-            # Flush to ensure options are created in database
-            await session.flush()
-            
-            # Increment poll version
+            await PollOptionCrud.add_options_to_poll(session, existing_poll.id, new_options)
             existing_poll.version_id += 1
+
             await session.flush()
-            
-            # Clear cache to ensure fresh data
-            session.expunge_all()
-            
-            # Get updated poll with all options
+
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             
-            # Get creator UUID
-            from models import UserModel
-            from sqlalchemy import select
-            creator_result = await session.execute(
-                select(UserModel).where(UserModel.id == updated_poll.created_by)
+            response_data = await PollCrud.build_poll_response_data(session, updated_poll)
+            
+            total_votes, option_percentages = await VoteCrud.get_vote_percentages(
+                session, updated_poll.id, updated_poll.poll_options
             )
-            creator = creator_result.scalars().first()
-            
-            options_list = [
-                PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                for opt in updated_poll.poll_options
-            ]
-            
-            # Get vote counts for summary
-            vote_counts = await VoteCrud.get_vote_counts_by_poll(session, updated_poll.id)
-            total_votes = sum(vote_counts.values())
-            
-            # Calculate percentages for each option
-            option_percentages = {}
-            if total_votes > 0:
-                for opt in updated_poll.poll_options:
-                    option_vote_count = vote_counts.get(opt.id, 0)
-                    percentage = (option_vote_count / total_votes) * 100
-                    option_percentages[str(opt.uuid)] = round(percentage, 2)
-            else:
-                for opt in updated_poll.poll_options:
-                    option_percentages[str(opt.uuid)] = 0.0
-            
-            response_data = {
-                "uuid": updated_poll.uuid,
-                "title": updated_poll.title,
-                "likes": updated_poll.likes,
-                "created_at": updated_poll.created_at,
-                "version_id": updated_poll.version_id,
-                "created_by_uuid": creator.uuid if creator else None,
-                "options": options_list
-            }
             
         validated_response = PollResponseWithVersionId.model_validate(response_data)
         
@@ -314,28 +250,7 @@ async def get_all_polls(
             
             response_list = []
             for poll in polls:
-                # Get creator UUID
-                from sqlalchemy import select
-                from models import UserModel
-                creator_result = await session.execute(
-                    select(UserModel).where(UserModel.id == poll.created_by)
-                )
-                creator = creator_result.scalars().first()
-                
-                options_list = [
-                    PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                    for opt in poll.poll_options
-                ]
-                
-                poll_data = {
-                    "uuid": poll.uuid,
-                    "title": poll.title,
-                    "likes": poll.likes,
-                    "created_at": poll.created_at,
-                    "version_id": poll.version_id,
-                    "created_by_uuid": creator.uuid if creator else None,
-                    "options": options_list
-                }
+                poll_data = await PollCrud.build_poll_response_data(session, poll)
                 response_list.append(PollResponseWithVersionId.model_validate(poll_data))
             
             return response_list
@@ -351,10 +266,8 @@ async def delete_poll_options(
     delete_data: DeletePollOptionsRequestSchema,
     current_user: AuthenticatedUser
 ):
-    """Soft delete options from an existing poll."""
     try:
         async with session.begin():
-            # Verify poll exists and user owns it
             existing_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             if not existing_poll:
                 raise HTTPException(status_code=404, detail="Poll not found")
@@ -365,39 +278,17 @@ async def delete_poll_options(
                     detail="You don't have permission to delete options from this poll"
                 )
             
-            # Verify all option UUIDs belong to this poll
-            from sqlalchemy import select
-            from models import PollOptions
-            
-            # Get only active options for this poll
-            existing_options_result = await session.execute(
-                select(PollOptions)
-                .where(PollOptions.poll_id == existing_poll.id)
-                .where(PollOptions.is_active == True)
-            )
-            existing_options = existing_options_result.scalars().all()
-            
-            valid_option_uuids = [str(opt.uuid) for opt in existing_options]
-            requested_uuids = [str(uuid) for uuid in delete_data.option_uuids]
-            
-            # Check if all requested UUIDs exist for this poll
-            for uuid in requested_uuids:
-                if uuid not in valid_option_uuids:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Option with UUID {uuid} does not belong to this poll or is already deleted"
-                    )
-            
-            # Soft delete the options
-            deleted_count = await PollOptionCrud.soft_delete_options_by_uuids(
+            # Validate and soft delete the options
+            deleted_count = await PollOptionCrud.soft_delete_options_by_uuids_for_poll(
                 session,
-                requested_uuids
+                existing_poll.id,
+                delete_data.option_uuids
             )
             
             if deleted_count == 0:
                 raise HTTPException(
                     status_code=400,
-                    detail="No options were deleted"
+                    detail="No valid options were found to delete. Options may not belong to this poll or are already deleted."
                 )
             
             # Increment poll version
@@ -410,43 +301,13 @@ async def delete_poll_options(
             # Get updated poll with remaining options
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             
-            # Get creator UUID
-            from models import UserModel
-            from sqlalchemy import select
-            creator_result = await session.execute(
-                select(UserModel).where(UserModel.id == updated_poll.created_by)
+            # Build response data
+            response_data = await PollCrud.build_poll_response_data(session, updated_poll)
+            
+            # Get vote percentages for summary
+            total_votes, option_percentages = await VoteCrud.get_vote_percentages(
+                session, updated_poll.id, updated_poll.poll_options
             )
-            creator = creator_result.scalars().first()
-            
-            options_list = [
-                PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                for opt in updated_poll.poll_options
-            ]
-            
-            # Get vote counts for summary
-            vote_counts = await VoteCrud.get_vote_counts_by_poll(session, updated_poll.id)
-            total_votes = sum(vote_counts.values())
-            
-            # Calculate percentages for each option
-            option_percentages = {}
-            if total_votes > 0:
-                for opt in updated_poll.poll_options:
-                    option_vote_count = vote_counts.get(opt.id, 0)
-                    percentage = (option_vote_count / total_votes) * 100
-                    option_percentages[str(opt.uuid)] = round(percentage, 2)
-            else:
-                for opt in updated_poll.poll_options:
-                    option_percentages[str(opt.uuid)] = 0.0
-            
-            response_data = {
-                "uuid": updated_poll.uuid,
-                "title": updated_poll.title,
-                "likes": updated_poll.likes,
-                "created_at": updated_poll.created_at,
-                "version_id": updated_poll.version_id,
-                "created_by_uuid": creator.uuid if creator else None,
-                "options": options_list
-            }
             
         validated_response = PollResponseWithVersionId.model_validate(response_data)
         
@@ -572,12 +433,11 @@ async def vote_on_poll(
             if not existing_poll:
                 raise HTTPException(status_code=404, detail="Poll not found")
             
-            # Find the option by UUID and get its ID
-            option_found = None
-            for opt in existing_poll.poll_options:
-                if opt.uuid == vote_data.option_uuid:
-                    option_found = opt
-                    break
+            option_found = await PollOptionCrud.get_active_option_by_uuid_and_poll_id(
+                session,
+                str(vote_data.option_uuid),
+                existing_poll.id
+            )
             
             if not option_found:
                 raise HTTPException(
@@ -585,15 +445,7 @@ async def vote_on_poll(
                     detail=f"Option {vote_data.option_uuid} not found for this poll"
                 )
             
-            # Check if user already voted
-            existing_vote = await VoteCrud.get_vote(session, current_user.id, existing_poll.id)
-            
-            if existing_vote:
-                # Update vote
-                await VoteCrud.delete_vote(session, current_user.id, existing_poll.id)
-            
-            # Create new vote using option_id
-            await VoteCrud.create_vote(
+            await VoteCrud.upsert_vote(
                 session,
                 current_user.id,
                 existing_poll.id,
@@ -602,32 +454,15 @@ async def vote_on_poll(
             
             await session.flush()
             
-            # Reload poll to get fresh option data
-            from models import PollOptions
-            from sqlalchemy import select
-            fresh_options_result = await session.execute(
-                select(PollOptions)
-                .where(PollOptions.poll_id == existing_poll.id)
-                .where(PollOptions.is_active == True)
+            fresh_options = await PollOptionCrud.get_active_options_by_poll_id(
+                session,
+                existing_poll.id
             )
-            fresh_options = fresh_options_result.scalars().all()
             
-            # Calculate summary after voting
-            vote_counts = await VoteCrud.get_vote_counts_by_poll(session, existing_poll.id)
-            total_votes = sum(vote_counts.values())
+            total_votes, option_percentages = await VoteCrud.get_vote_percentages(
+                session, existing_poll.id, fresh_options
+            )
             
-            # Calculate percentages for each option
-            option_percentages = {}
-            if total_votes > 0:
-                for opt in fresh_options:
-                    option_vote_count = vote_counts.get(opt.id, 0)
-                    percentage = (option_vote_count / total_votes) * 100
-                    option_percentages[str(opt.uuid)] = round(percentage, 2)
-            else:
-                for opt in fresh_options:
-                    option_percentages[str(opt.uuid)] = 0.0
-            
-            # Create summary data
             summary = PollSummaryData(
                 total_votes=total_votes,
                 option_percentages=option_percentages
@@ -640,7 +475,6 @@ async def vote_on_poll(
                 summary=summary
             )
             
-            # Broadcast vote update with summary to all connected clients
             await manager.broadcast({
                 "type": "poll_voted",
                 "data": {

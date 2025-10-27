@@ -1,7 +1,7 @@
 from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Sequence, Optional
-
+from models import Poll
 from models import Like
 
 
@@ -66,10 +66,6 @@ class LikeCrud:
         return len(result.scalars().all())
     
     async def get_liked_polls_by_user(self, session: AsyncSession, user_id: int):
-        """Get poll UUIDs that the user has actively liked."""
-        from models import Poll
-        
-        # Join Like with Poll to get poll UUIDs
         stmt = select(Poll.uuid).join(
             Like, Poll.id == Like.poll_id
         ).where(

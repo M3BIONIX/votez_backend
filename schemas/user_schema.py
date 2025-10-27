@@ -48,7 +48,6 @@ class TokenData(BaseModel):
 
 
 class VotedPollInfo(BaseModel):
-    """Schema for user's voted poll information."""
     poll_uuid: UUID
     option_uuid: UUID
     total_votes: int
@@ -56,7 +55,6 @@ class VotedPollInfo(BaseModel):
 
 
 class UserMeResponse(BaseModel):
-    """Response schema for /auth/me endpoint with extended user data."""
     id: int
     name: str
     email: str

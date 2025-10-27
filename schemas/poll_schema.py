@@ -58,27 +58,23 @@ class DeletePollOptionsRequestSchema(BaseModel):
 
 
 class PollSummaryResponse(BaseModel):
-    """Deprecated: Use PollSummaryData instead. Response schema for poll vote summary."""
     poll_uuid: UUID
     total_votes: int
     option_summary: Dict[str, float]  # option_uuid -> percentage
 
 
 class LikeResponseSchema(BaseModel):
-    """Response schema for like/unlike operations."""
     poll_uuid: UUID
     user_id: int
     is_liked: bool
 
 
 class PollSummaryData(BaseModel):
-    """Summary data for poll vote statistics."""
     total_votes: int
     option_percentages: Dict[str, float]  # option_uuid -> percentage
 
 
 class VoteResponseSchema(BaseModel):
-    """Response schema for vote operations with summary."""
     message: str
     poll_uuid: UUID
     option_uuid: UUID

@@ -9,18 +9,15 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 
 class JsonConfigSettingsSource(PydanticBaseSettingsSource):
-    """A simple settings source class that loads variables"""
 
     json_secret: ClassVar[dict[str, Any]] = {}
 
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
-        """Gets the corresponding secret from json."""
         field_value = self.json_secret.get(field_name)
         return field_value, field_name, False
 
     def prepare_field_value(self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool) -> Any:  # noqa: ANN401
-        """Can be used to process complex secrets like json or tuple."""
         return value
 
     def __call__(self) -> dict[str, Any]:  # noqa: D102
@@ -84,8 +81,6 @@ class Settings(BaseSettings):
     WATCH_FILES: bool = False
 
     class Config:
-        """Inner class for configurations of settings."""
-
         env_file = "local.env"
         case_sensitive = True
         extra = "allow"
@@ -100,10 +95,6 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """
-        Loads custom setting from AWS Secrets Manager, and then from dotenv. However, here dotenv has lower precedence
-        and won't overwrite variable values from secret manager.
-        """
         return JsonConfigSettingsSource(settings_cls), dotenv_settings
 
 settings = Settings()
