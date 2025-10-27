@@ -4,10 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 class PollOptionSchema(BaseModel):
-    id: int
     option_name: str = Field(..., min_length=1, max_length=200)
     votes: int
-    poll_id: int
     uuid: UUID
     version_id: int
     created_at: datetime
@@ -31,6 +29,10 @@ class UpdatePollRequestSchema(BaseModel):
     version_id: int
     options: Optional[List[UpdatePollOptionSchema]] = None
 
+class PollSummaryData(BaseModel):
+    total_votes: int
+    option_percentages: Dict[str, float]  # option_uuid -> percentage
+
 class PollResponseSchema(BaseModel):
     uuid: UUID
     title: str
@@ -43,6 +45,7 @@ class PollResponseSchema(BaseModel):
 
 class PollResponseWithVersionId(PollResponseSchema):
     version_id: int
+    summary: Optional[PollSummaryData] = None
 
 
 class VoteRequestSchema(BaseModel):
@@ -65,13 +68,7 @@ class PollSummaryResponse(BaseModel):
 
 class LikeResponseSchema(BaseModel):
     poll_uuid: UUID
-    user_id: int
     is_liked: bool
-
-
-class PollSummaryData(BaseModel):
-    total_votes: int
-    option_percentages: Dict[str, float]  # option_uuid -> percentage
 
 
 class VoteResponseSchema(BaseModel):

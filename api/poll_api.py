@@ -58,9 +58,12 @@ async def create_poll(
             ]
             poll_options = await PollOptionCrud.create_options(session, options_data)
             
+            # Sort options by id (ascending order) to ensure consistent ordering
+            sorted_poll_options = sorted(poll_options, key=lambda opt: opt.id)
+            
             options_list = [
                 PollOptionSchema.model_validate(opt).model_dump(mode="json")
-                for opt in poll_options
+                for opt in sorted_poll_options
             ]
             
             response_data = {
@@ -156,6 +159,9 @@ async def edit_poll(
                 existing_poll.title = poll.title
                 existing_poll.version_id += 1
                 await session.flush()
+            
+            # Expunge all objects from session to clear cache and ensure fresh data is fetched
+            session.expunge_all()
 
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             response_data = await PollCrud.build_poll_response_data(session, updated_poll)
@@ -207,8 +213,14 @@ async def add_options_to_poll(
             
             await PollOptionCrud.add_options_to_poll(session, existing_poll.id, new_options)
             existing_poll.version_id += 1
+            
+            # Delete all votes for this poll since options have changed
+            await VoteCrud.delete_all_votes_for_poll(session, existing_poll.id)
 
             await session.flush()
+            
+            # Expunge all objects from session to clear cache and ensure fresh data is fetched
+            session.expunge_all()
 
             updated_poll = await PollCrud.get_poll_by_uuid(session, poll_uuid)
             
@@ -220,15 +232,25 @@ async def add_options_to_poll(
             
         validated_response = PollResponseWithVersionId.model_validate(response_data)
         
+        # Send a poll_voted event with total_votes: 0 to indicate votes were cleared and poll is votable
         await manager.broadcast({
-            "type": "poll_options_added",
+            "type": "poll_voted",
             "data": {
-                **validated_response.model_dump(mode="json"),
+                "poll_uuid": str(poll_uuid),
+                "total_votes": 0,
                 "summary": {
-                    "total_votes": total_votes,
-                    "option_percentages": option_percentages
+                    "total_votes": 0,
+                    "option_percentages": {}
                 }
             }
+        })
+        
+        # Build broadcast data
+        broadcast_data = validated_response.model_dump(mode="json")
+        
+        await manager.broadcast({
+            "type": "poll_options_added",
+            "data": broadcast_data
         })
         
         return validated_response
@@ -278,6 +300,15 @@ async def delete_poll_options(
                     detail="You don't have permission to delete options from this poll"
                 )
             
+            # Get the option IDs that will be deleted to check if they have votes
+            options_to_delete = await PollOptionCrud.get_active_options_by_poll_id(session, existing_poll.id)
+            options_to_delete_by_uuid = {str(opt.uuid): opt.id for opt in options_to_delete}
+            option_ids_to_delete = [options_to_delete_by_uuid.get(str(uuid)) for uuid in delete_data.option_uuids if str(uuid) in options_to_delete_by_uuid]
+            option_ids_to_delete = [opt_id for opt_id in option_ids_to_delete if opt_id is not None]
+            
+            # Check if any of the options being deleted have votes
+            has_votes = await VoteCrud.has_votes_for_options(session, existing_poll.id, option_ids_to_delete) if option_ids_to_delete else False
+            
             # Validate and soft delete the options
             deleted_count = await PollOptionCrud.soft_delete_options_by_uuids_for_poll(
                 session,
@@ -293,6 +324,11 @@ async def delete_poll_options(
             
             # Increment poll version
             existing_poll.version_id += 1
+            
+            # Only delete votes if the deleted options had votes
+            if has_votes:
+                await VoteCrud.delete_all_votes_for_poll(session, existing_poll.id)
+            
             await session.flush()
             
             # Expunge all objects from session to clear cache
@@ -311,15 +347,27 @@ async def delete_poll_options(
             
         validated_response = PollResponseWithVersionId.model_validate(response_data)
         
+        # Broadcast that votes were cleared due to options being deleted (only if votes were cleared)
+        if has_votes:
+            # Send a poll_voted event with total_votes: 0 to indicate votes were cleared and poll is votable
+            await manager.broadcast({
+                "type": "poll_voted",
+                "data": {
+                    "poll_uuid": str(poll_uuid),
+                    "total_votes": 0,
+                    "summary": {
+                        "total_votes": 0,
+                        "option_percentages": {}
+                    }
+                }
+            })
+        
+        # Build broadcast data
+        broadcast_data = validated_response.model_dump(mode="json")
+        
         await manager.broadcast({
             "type": "poll_options_deleted",
-            "data": {
-                **validated_response.model_dump(mode="json"),
-                "summary": {
-                    "total_votes": total_votes,
-                    "option_percentages": option_percentages
-                }
-            }
+            "data": broadcast_data
         })
         
         return validated_response
@@ -396,7 +444,6 @@ async def toggle_like(
             
             response = LikeResponseSchema(
                 poll_uuid=poll_uuid,
-                user_id=current_user.id,
                 is_liked=is_liked
             )
             

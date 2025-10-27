@@ -19,7 +19,6 @@ class UserLogin(BaseModel):
 
 
 class AuthUser(BaseModel):
-    id: int
     name: str
     email: str
     uuid: UUID
@@ -29,7 +28,6 @@ class AuthUser(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
     name: str
     email: str
     uuid: UUID
@@ -51,11 +49,10 @@ class VotedPollInfo(BaseModel):
     poll_uuid: UUID
     option_uuid: UUID
     total_votes: int
-    summary: Dict[str, float] = Field(default_factory=dict)  # option_uuid -> percentage
+    percentage: float  # percentage of votes for the selected option
 
 
 class UserMeResponse(BaseModel):
-    id: int
     name: str
     email: str
     uuid: UUID

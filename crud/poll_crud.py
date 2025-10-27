@@ -61,16 +61,30 @@ class PollCrud:
         poll: Poll,
         current_user_uuid: Optional[UUID] = None
     ) -> Dict[str, Any]:
+        from crud.vote_crud import vote_crud as VoteCrud
+        from schemas.poll_schema import PollSummaryData
 
         if current_user_uuid is None:
             current_user_uuid = await self.get_creator_uuid(session, poll.created_by)
         
-        options_list = [
-            PollOptionSchema.model_validate(opt).model_dump(mode="json")
-            for opt in poll.poll_options
-        ]
+        # Get actual vote counts from the Vote table
+        vote_counts = await VoteCrud.get_vote_counts_by_poll(session, poll.id)
         
-        return {
+        # Sort options by id (ascending order) and build options list with actual vote counts
+        sorted_options = sorted(poll.poll_options, key=lambda opt: opt.id)
+        options_list = []
+        for opt in sorted_options:
+            option_data = PollOptionSchema.model_validate(opt).model_dump(mode="json")
+            # Replace the stored votes field with actual vote count from Vote table
+            option_data["votes"] = vote_counts.get(opt.id, 0)
+            options_list.append(option_data)
+        
+        # Calculate vote summary (total votes and percentages)
+        total_votes, option_percentages = await VoteCrud.get_vote_percentages(
+            session, poll.id, poll.poll_options
+        )
+        
+        response_dict = {
             "uuid": poll.uuid,
             "title": poll.title,
             "likes": poll.likes,
@@ -79,6 +93,16 @@ class PollCrud:
             "created_by_uuid": current_user_uuid,
             "options": options_list
         }
+        
+        # Only include summary if there are votes
+        if total_votes > 0:
+            summary = PollSummaryData(
+                total_votes=total_votes,
+                option_percentages=option_percentages
+            )
+            response_dict["summary"] = summary.model_dump()
+        
+        return response_dict
 
 
 poll_crud = PollCrud()
