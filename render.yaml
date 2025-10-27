@@ -32,22 +32,22 @@ services:
         value: '["https://YOUR_FRONTEND_URL.com"]'
       - key: FRONTEND_URL
         value: "https://YOUR_FRONTEND_URL.com"
-      - fromDatabase:
+      - key: POSTGRES_SERVER
+        fromDatabase:
           name: votez-db
           property: host
-          envVarKey: POSTGRES_SERVER
-      - fromDatabase:
+      - key: POSTGRES_USER
+        fromDatabase:
           name: votez-db
           property: user
-          envVarKey: POSTGRES_USER
-      - fromDatabase:
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
           name: votez-db
           property: password
-          envVarKey: POSTGRES_PASSWORD
-      - fromDatabase:
+      - key: POSTGRES_DB
+        fromDatabase:
           name: votez-db
           property: database
-          envVarKey: POSTGRES_DB
 
 databases:
   - name: votez-db
