@@ -1,10 +1,10 @@
 from logging.config import fileConfig
+import os
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 import models
 from alembic import context
-from core.settings import settings
 from core.base import Base
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -20,6 +20,36 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+# Get database URL - use environment variable directly to avoid loading settings
+# during build when env vars might not be available
+def get_database_url():
+    """Get database URL from environment or settings"""
+    # Try to get from environment first (for Railway, Render, etc.)
+    if "DATABASE_URL" in os.environ:
+        db_url = os.environ["DATABASE_URL"]
+        # Convert postgresql:// to postgresql+psycopg:// for compatibility
+        if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg://")
+        return db_url
+    
+    # Fall back to building from individual components
+    if all(k in os.environ for k in ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_SERVER", "POSTGRES_DB"]):
+        from urllib.parse import quote_plus
+        username = quote_plus(os.environ["POSTGRES_USER"])
+        password = quote_plus(os.environ["POSTGRES_PASSWORD"])
+        host = os.environ["POSTGRES_SERVER"]
+        db = os.environ["POSTGRES_DB"]
+        return f"postgresql+psycopg://{username}:{password}@{host}/{db}"
+    
+    # Finally try to import settings (this should work at runtime)
+    try:
+        from core.settings import settings
+        return settings.SQLALCHEMY_DATABASE_URI
+    except Exception:
+        return ""
+
+settings = type('Settings', (), {'SQLALCHEMY_DATABASE_URI': get_database_url()})
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -39,6 +69,9 @@ def run_migrations_offline() -> None:
 
     """
     url = settings.SQLALCHEMY_DATABASE_URI
+    if not url:
+        raise ValueError("Database URL is not configured. Please set DATABASE_URL or individual POSTGRES_* environment variables.")
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -57,8 +90,12 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    db_url = settings.SQLALCHEMY_DATABASE_URI
+    if not db_url:
+        raise ValueError("Database URL is not configured. Please set DATABASE_URL or individual POSTGRES_* environment variables.")
+    
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.SQLALCHEMY_DATABASE_URI
+    configuration["sqlalchemy.url"] = db_url
     connectable = engine_from_config(
         configuration, prefix="sqlalchemy.", poolclass=pool.NullPool,
     )
