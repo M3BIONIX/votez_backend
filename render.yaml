@@ -2,8 +2,7 @@ services:
   - type: web
     name: votez-backend
     env: python
-    runtime: python-3.11
-    plan: starter
+    plan: free
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -23,28 +22,27 @@ services:
         value: 0
       - key: LOG_LEVEL
         value: info
-      # IMPORTANT: Update these with your frontend URL after deployment
       - key: BACKEND_CORS_ORIGINS
         value: https://your-frontend-domain.com
       - key: FRONTEND_URL
         value: https://your-frontend-domain.com
       - fromDatabase:
-          name: votez-db
+          name: votez
           property: host
           key: POSTGRES_SERVER
       - fromDatabase:
-          name: votez-db
+          name: votez
           property: user
           key: POSTGRES_USER
       - fromDatabase:
-          name: votez-db
+          name: m3bionix_votez
           property: password
           key: POSTGRES_PASSWORD
       - fromDatabase:
-          name: votez-db
+          name: votez
           property: database
           key: POSTGRES_DB
 
 databases:
-  - name: votez-db
-    plan: starter
+  - name: votez
+    plan: free
