@@ -7,22 +7,40 @@ from api.api import api_router
 
 app = FastAPI(title="Votez API", version="1.0.0")
 
+# Debug: Log CORS configuration
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info(f"BACKEND_CORS_ORIGINS value: {settings.BACKEND_CORS_ORIGINS}")
+logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+logger.info(f"BACKEND_CORS_ORIGINS length: {len(settings.BACKEND_CORS_ORIGINS) if settings.BACKEND_CORS_ORIGINS else 0}")
+
 # Add CORS middleware BEFORE including routes (important for WebSocket)
+# Always add CORS middleware to ensure WebSocket connections work
 if settings.BACKEND_CORS_ORIGINS:
+    logger.info(f"Adding CORS middleware with origins: {settings.BACKEND_CORS_ORIGINS}")
     cors_origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        max_age=32400,
-        expose_headers=["Content-Disposition"],
-    )
+else:
+    # Default to wildcard for development/production flexibility
+    logger.info("No CORS origins configured, using wildcard")
+    cors_origins = ["*"]
+
+# Always add CORS middleware to ensure WebSocket connections work
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=cors_origins != ["*"],  # Don't use credentials with wildcard
+    allow_methods=["*"],
+    allow_headers=["*"],
+    max_age=32400,
+    expose_headers=["Content-Disposition"],
+)
 
 add_pagination(app)
 
 app.include_router(api_router)
+
+logger.info("FastAPI app initialized with CORS middleware")
 
 @app.get("/")
 async def root():
