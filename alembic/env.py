@@ -49,7 +49,17 @@ def get_database_url():
     except Exception:
         return ""
 
-settings = type('Settings', (), {'SQLALCHEMY_DATABASE_URI': get_database_url()})
+# Don't call get_database_url() at module level - it should be called lazily
+# Settings object will be created with a property that calls get_database_url() when accessed
+class LazyDatabaseUrl:
+    """Lazy-load the database URL when actually needed"""
+    def __str__(self):
+        return get_database_url()
+    
+    def __bool__(self):
+        return bool(get_database_url())
+
+settings = type('Settings', (), {'SQLALCHEMY_DATABASE_URI': LazyDatabaseUrl()})
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -68,7 +78,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = settings.SQLALCHEMY_DATABASE_URI
+    url = get_database_url()
     if not url:
         raise ValueError("Database URL is not configured. Please set DATABASE_URL or individual POSTGRES_* environment variables.")
     
@@ -90,7 +100,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    db_url = settings.SQLALCHEMY_DATABASE_URI
+    db_url = get_database_url()
     if not db_url:
         raise ValueError("Database URL is not configured. Please set DATABASE_URL or individual POSTGRES_* environment variables.")
     
