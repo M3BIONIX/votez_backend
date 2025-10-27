@@ -1,4 +1,5 @@
 import json
+import os
 import secrets
 
 from typing import Any, ClassVar
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
     SERVER_NAME: str = None
     SERVER_HOST: AnyHttpUrl = None
     SERVER_ADDRESS: str = None
-    SERVER_PORT: int = 8000
+    SERVER_PORT: int = int(os.getenv("PORT", 8000))  # Default 8000, but use PORT for Render
     BACKEND_CORS_ORIGINS: list[str] = []
 
     @classmethod
@@ -79,6 +80,7 @@ class Settings(BaseSettings):
     COOKIE_KEY: str = None
 
     WATCH_FILES: bool = False
+    LOG_LEVEL: str = "info"  # Logging level: critical, error, warning, info, debug, trace
 
     class Config:
         env_file = "local.env"
