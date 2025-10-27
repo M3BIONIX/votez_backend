@@ -2,7 +2,7 @@ import json
 import os
 import secrets
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Optional
 
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator
 from pydantic.fields import FieldInfo, computed_field
@@ -37,9 +37,9 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    SERVER_NAME: str = None
-    SERVER_HOST: AnyHttpUrl = None
-    SERVER_ADDRESS: str = None
+    SERVER_NAME: Optional[str] = None
+    SERVER_HOST: Optional[AnyHttpUrl] = None
+    SERVER_ADDRESS: Optional[str] = None
     SERVER_PORT: int = int(os.getenv("PORT", 8000))  # Default 8000, but use PORT for Render
     BACKEND_CORS_ORIGINS: list[str] = []
 
@@ -55,17 +55,29 @@ class Settings(BaseSettings):
                         raise ValueError(v) from None
             return v
 
-    FRONTEND_URL: str = None
-    POSTGRES_SERVER: str = None
-    POSTGRES_USER: str = None
-    POSTGRES_PASSWORD: str = None
-    POSTGRES_DB: str = None
+    FRONTEND_URL: Optional[str] = None
+    POSTGRES_SERVER: Optional[str] = None
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: Optional[str] = None
+    POSTGRES_DB: Optional[str] = None
     POSTGRES_POOL_SIZE: int = 50
     POSTGRES_MAX_OVERFLOW: int = 0
 
     @computed_field
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
+        # Check for DATABASE_URL first (Railway, Render, etc.)
+        if "DATABASE_URL" in os.environ:
+            db_url = os.environ["DATABASE_URL"]
+            # Convert postgresql:// to postgresql+psycopg:// for compatibility
+            if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
+                db_url = db_url.replace("postgresql://", "postgresql+psycopg://")
+            return db_url
+        
+        # Build database URI only if we have the required values
+        if not all([self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_SERVER, self.POSTGRES_DB]):
+            return ""
+        
         return str(
             PostgresDsn.build(
                 scheme="postgresql+psycopg",
@@ -77,7 +89,7 @@ class Settings(BaseSettings):
         )
 
     # Cookie
-    COOKIE_KEY: str = None
+    COOKIE_KEY: Optional[str] = None
 
     WATCH_FILES: bool = False
     LOG_LEVEL: str = "info"  # Logging level: critical, error, warning, info, debug, trace
