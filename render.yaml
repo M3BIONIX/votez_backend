@@ -1,6 +1,7 @@
 services:
   - type: web
     name: votez-backend
+    plan: free
     env: python
     repo: https://github.com/M3BIONIX/votez_backend
     branch: main
