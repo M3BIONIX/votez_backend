@@ -4,9 +4,10 @@ from fastapi import HTTPException, APIRouter, status, Depends
 from core.depends import AsyncDBSession, AuthenticatedUser
 from core.auth import verify_password, create_access_token
 from core.settings import settings
-from schemas.user_schema import UserCreate, UserLogin, AuthUser, Token
+from schemas.user_schema import UserCreate, UserLogin, AuthUser, Token, UserMeResponse
 from crud.user_crud import user_crud as UserCrud
-
+from crud.like_crud import like_crud as LikeCrud
+from crud.vote_crud import vote_crud as VoteCrud
 
 
 router = APIRouter(
@@ -21,25 +22,25 @@ async def register(
     user_data: UserCreate
 ):
     try:
-        async with session.begin():
-            existing_user = await UserCrud.get_user_by_email(session, user_data.email)
-            if existing_user:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="User with this email already exists"
-                )
-            
-            # Create new user
-            user_dict = user_data.model_dump()
-            user = await UserCrud.create_user(session, user_dict)
-            
-            return AuthUser(
-                id=user.id,
-                name=user.name,
-                email=user.email,
-                uuid=user.uuid,
-                created_at=user.created_at
+        existing_user = await UserCrud.get_user_by_email(session, user_data.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
             )
+        
+        user_dict = user_data.model_dump()
+        user = await UserCrud.create_user(session, user_dict)
+        
+        await session.commit()
+        
+        return AuthUser(
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            uuid=user.uuid,
+            created_at=user.created_at
+        )
     
     except HTTPException:
         raise
@@ -91,13 +92,30 @@ async def login(
         )
 
 
-@router.get("/me", response_model=AuthUser)
-async def get_current_user_info(current_user: AuthenticatedUser):
-    return AuthUser(
-        id=current_user.id,
-        name=current_user.name,
-        email=current_user.email,
-        uuid=current_user.uuid,
-        created_at=current_user.created_at
-    )
+@router.get("/me", response_model=UserMeResponse)
+async def get_current_user_info(
+    session: AsyncDBSession,
+    current_user: AuthenticatedUser
+):
+    """Get current user info including liked polls and voted options."""
+    try:
+        async with session.begin():
+            liked_poll_uuids = await LikeCrud.get_liked_polls_by_user(session, current_user.id)
+            voted_polls = await VoteCrud.get_voted_polls_info(session, current_user.id)
+        
+        return UserMeResponse(
+            id=current_user.id,
+            name=current_user.name,
+            email=current_user.email,
+            uuid=current_user.uuid,
+            created_at=current_user.created_at,
+            liked_poll_uuids=liked_poll_uuids,
+            voted_polls=voted_polls
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch user data: {str(e)}"
+        )
 

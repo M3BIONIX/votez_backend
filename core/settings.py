@@ -1,4 +1,5 @@
 import json
+import os
 import secrets
 
 from typing import Any, ClassVar
@@ -9,18 +10,15 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 
 class JsonConfigSettingsSource(PydanticBaseSettingsSource):
-    """A simple settings source class that loads variables"""
 
     json_secret: ClassVar[dict[str, Any]] = {}
 
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
-        """Gets the corresponding secret from json."""
         field_value = self.json_secret.get(field_name)
         return field_value, field_name, False
 
     def prepare_field_value(self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool) -> Any:  # noqa: ANN401
-        """Can be used to process complex secrets like json or tuple."""
         return value
 
     def __call__(self) -> dict[str, Any]:  # noqa: D102
@@ -42,7 +40,7 @@ class Settings(BaseSettings):
     SERVER_NAME: str = None
     SERVER_HOST: AnyHttpUrl = None
     SERVER_ADDRESS: str = None
-    SERVER_PORT: int = 8000
+    SERVER_PORT: int = int(os.getenv("PORT", 8000))  # Default 8000, but use PORT for Render
     BACKEND_CORS_ORIGINS: list[str] = []
 
     @classmethod
@@ -82,10 +80,9 @@ class Settings(BaseSettings):
     COOKIE_KEY: str = None
 
     WATCH_FILES: bool = False
+    LOG_LEVEL: str = "info"  # Logging level: critical, error, warning, info, debug, trace
 
     class Config:
-        """Inner class for configurations of settings."""
-
         env_file = "local.env"
         case_sensitive = True
         extra = "allow"
@@ -100,10 +97,6 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """
-        Loads custom setting from AWS Secrets Manager, and then from dotenv. However, here dotenv has lower precedence
-        and won't overwrite variable values from secret manager.
-        """
         return JsonConfigSettingsSource(settings_cls), dotenv_settings
 
 settings = Settings()

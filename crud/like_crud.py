@@ -1,7 +1,7 @@
 from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Sequence, Optional
-
+from models import Poll
 from models import Like
 
 
@@ -64,6 +64,16 @@ class LikeCrud:
         stmt = select(Like).where(Like.poll_id == poll_id, Like.is_active == True)
         result = await session.execute(stmt)
         return len(result.scalars().all())
+    
+    async def get_liked_polls_by_user(self, session: AsyncSession, user_id: int):
+        stmt = select(Poll.uuid).join(
+            Like, Poll.id == Like.poll_id
+        ).where(
+            Like.user_id == user_id,
+            Like.is_active == True
+        )
+        result = await session.execute(stmt)
+        return [row[0] for row in result.fetchall()]
 
 
 like_crud = LikeCrud()

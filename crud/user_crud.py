@@ -7,13 +7,11 @@ from core.auth import get_password_hash
 
 
 class UserCrud:
-    """CRUD operations for User model."""
-    
+
     def __init__(self):
         self.table = UserModel
     
     async def create_user(self, session: AsyncSession, user_data: dict) -> UserModel:
-        """Create a new user with hashed password."""
         user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
         user = UserModel(**user_data)
         session.add(user)
