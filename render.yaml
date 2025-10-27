@@ -26,22 +26,22 @@ services:
         value: https://your-frontend-domain.com
       - key: FRONTEND_URL
         value: https://your-frontend-domain.com
-      - fromDatabase:
+      - key: POSTGRES_SERVER
+        fromDatabase:
           name: votez
           property: host
-          key: POSTGRES_SERVER
-      - fromDatabase:
+      - key: POSTGRES_USER
+        fromDatabase:
           name: votez
           property: user
-          key: POSTGRES_USER
-      - fromDatabase:
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
           name: m3bionix_votez
           property: password
-          key: POSTGRES_PASSWORD
-      - fromDatabase:
+      - key: POSTGRES_DB
+        fromDatabase:
           name: votez
           property: database
-          key: POSTGRES_DB
 
 databases:
   - name: votez
