@@ -1,11 +1,13 @@
 services:
   - type: web
     name: votez-backend
-    runtime: python-3.11
+    env: python
     plan: free
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
       - key: ENVIRONMENT
         value: production
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
