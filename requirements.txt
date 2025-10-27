@@ -2,7 +2,6 @@ uliweb-alembic
 fastapi-pagination
 sqlalchemy>=2.0.0
 pydantic-settings
-starlette==0.37.2
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 websockets==12.0
