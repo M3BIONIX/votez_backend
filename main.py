@@ -9,9 +9,10 @@ app = FastAPI(title="Votez API", version="1.0.0")
 
 # Add CORS middleware BEFORE including routes (important for WebSocket)
 if settings.BACKEND_CORS_ORIGINS:
+    cors_origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -22,9 +23,18 @@ if settings.BACKEND_CORS_ORIGINS:
 add_pagination(app)
 
 app.include_router(api_router)
+
 @app.get("/")
 async def root():
     return {"message": "Votez API", "version": "1.0.0"}
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "cors_origins": settings.BACKEND_CORS_ORIGINS,
+        "frontend_url": settings.FRONTEND_URL
+    }
 
 
 if __name__ == "__main__":

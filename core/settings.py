@@ -45,15 +45,42 @@ class Settings(BaseSettings):
 
     @classmethod
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    def assemble_cors_origins(cls, v: list[str]) -> list[str]:
+    def assemble_cors_origins(cls, v: Any) -> list[str]:
+        # If it's already a list, return it
         if isinstance(v, list):
-            for item in v:
-                if isinstance(item, str):
-                    try:
-                        return json.loads(item)
-                    except json.JSONDecodeError:
-                        raise ValueError(v) from None
             return v
+        
+        # If it's a string, try to parse it as JSON
+        if isinstance(v, str):
+            # Handle empty string
+            if not v.strip():
+                return []
+            
+            try:
+                # Parse the JSON string (e.g., '["http://localhost:3000"]')
+                parsed = json.loads(v)
+                
+                # Ensure it's a list
+                if isinstance(parsed, list):
+                    return parsed
+                elif isinstance(parsed, str):
+                    # If single string, return as list
+                    return [parsed]
+                else:
+                    return []
+            except (json.JSONDecodeError, ValueError):
+                # If JSON parsing fails, try comma-separated format
+                
+                # Try splitting by comma as fallback
+                if ',' in v:
+                    origins = [origin.strip() for origin in v.split(',') if origin.strip()]
+                    return origins
+                
+                # If no comma, treat as single origin string
+                return [v]
+        
+        # If None or other types, return empty list
+        return []
 
     FRONTEND_URL: Optional[str] = None
     POSTGRES_SERVER: Optional[str] = None
@@ -109,6 +136,7 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return JsonConfigSettingsSource(settings_cls), dotenv_settings
+        # Priority order: env_settings (system env vars) > dotenv_settings (local.env) > JsonConfigSettingsSource (custom JSON)
+        return env_settings, dotenv_settings, JsonConfigSettingsSource(settings_cls)
 
 settings = Settings()
