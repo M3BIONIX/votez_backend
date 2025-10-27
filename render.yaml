@@ -2,7 +2,7 @@ services:
   - type: web
     name: votez-backend
     env: python
-    runtime: python-3.11.7
+    runtime: python-3.11
     plan: starter
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -25,9 +25,9 @@ services:
         value: info
       # IMPORTANT: Update these with your frontend URL after deployment
       - key: BACKEND_CORS_ORIGINS
-        sync: false
+        value: https://your-frontend-domain.com
       - key: FRONTEND_URL
-        sync: false
+        value: https://your-frontend-domain.com
       - fromDatabase:
           name: votez-db
           property: host
